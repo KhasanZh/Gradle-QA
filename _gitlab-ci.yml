@@ -1,0 +1,32 @@
+stages:
+  - tests
+  - allure
+
+Run tests:
+  stage: tests
+  tags:
+    - windowsThreadQa
+  allow_failure: true
+  before_script:
+    - docker-compose rm --force
+  script:
+    - docker-compose build
+    - docker-compose up --exit-code-from tests
+  after_script:
+    - docker-compose stop
+  artifacts:
+    when: always
+    paths:
+      - build/allure-results
+
+Allure report:
+  stage: allure
+  tags:
+    - windowsThreadQa
+  script:
+    - ./gradlew allureReport
+    - echo "Allure report live here - https://${CI_PROJECT_NAMESPACE}.${CI_PAGES_DOMAIN}/-/${CI_PROJECT_NAME}/-/jobs/${CI_JOB_ID}/artifacts/build/reports/allure-report/allureReport/index.html"
+  artifacts:
+    when: always
+    paths:
+      - build/reports/allure-report/allureReport

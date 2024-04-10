@@ -1,0 +1,46 @@
+version: '3.7'
+
+# Общая сеть для каждого сервиса внутри связки докер контейнеров
+networks:
+  default:
+    name: threadqa
+
+services:
+  selenoid:
+    container_name: selenoid_gitlab_ci
+    image: "aerokube/selenoid:1.11.0"
+    ports:
+      - "4444:4444"
+    environment:
+      # здесь должна быть существующая папка на вашем компьютере
+      OVERRIDE_VIDEO_OUTPUT_DIR: C:\Users\Oleg\.aerokube\selenoid\video
+      DOCKER_API_VERSION: 1.41
+    volumes:
+      - ./:/usr/workspace
+      - C:\Users\Oleg\.aerokube\selenoid\video:/opt/selenoid/video
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: [ "-conf", "/usr/workspace/browsers.json", "-video-output-dir", "/opt/selenoid/video",
+               "-container-network", "threadqa",
+               "-limit", "10", "-retry-count", "2" ]
+  selenoid-ui:
+    container_name: selenoid_ui_gitlab_ci
+    image: "aerokube/selenoid-ui:1.10.10"
+    links:
+      - selenoid
+    ports:
+      - "8080:8080"
+    command: [ "--selenoid-uri", "http://selenoid:4444" ]
+  tests:
+    container_name: project-tests
+    links:
+      - selenoid
+    depends_on:
+      - selenoid
+      - selenoid-ui
+    image: "gradle:7.5.1-jdk11-alpine"
+    working_dir: /usr/workspace
+    #Тут прокидывается папка с проектом в контейнер. Все что выполняется в контейнере будет записываться в папку с проектом локально на компе
+    volumes:
+      - ./:/usr/workspace
+    command: >
+      sh -c "gradle clean myTags -x test -DcustomTags=API,UI -Dhost=http://selenoid:4444/wd/hub"
